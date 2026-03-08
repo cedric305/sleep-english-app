@@ -1,0 +1,351 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube 字幕播放器</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --accent: #ef4444;
+      --accent-soft: #fee2e2;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      background: radial-gradient(circle at top left, #e8f0ff 0%, var(--bg) 45%, #eef7ff 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .app {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .toolbar input {
+      flex: 1;
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0 12px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    .toolbar input:focus {
+      border-color: #94a3b8;
+      box-shadow: 0 0 0 3px #e2e8f0;
+    }
+
+    .toolbar button {
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 15px;
+      padding: 0 18px;
+      cursor: pointer;
+    }
+
+    .toolbar button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    }
+
+    #player {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #0f172a;
+    }
+
+    .captions {
+      height: min(72vh, 700px);
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .caption-row {
+      width: 100%;
+      border: 1px solid transparent;
+      background: #fff;
+      border-radius: 10px;
+      text-align: left;
+      padding: 10px 12px;
+      margin: 10px 0;
+      cursor: pointer;
+      transition: background-color 0.2s, border-color 0.2s;
+      display: block;
+    }
+
+    .caption-row:hover {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+    }
+
+    .caption-row.active {
+      background: var(--accent-soft);
+      border-color: #fca5a5;
+    }
+
+    .caption-time {
+      display: block;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .caption-text {
+      display: block;
+      font-size: 16px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .status {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      min-height: 20px;
+    }
+
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .captions {
+        height: 48vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="toolbar">
+      <input id="youtubeUrl" type="text" placeholder="貼上 YouTube 影片網址，例如：https://www.youtube.com/watch?v=..." />
+      <button id="loadBtn">讀取字幕</button>
+    </div>
+
+    <div class="layout">
+      <div class="panel">
+        <div id="player"></div>
+      </div>
+
+      <div class="panel">
+        <div id="captions" class="captions"></div>
+      </div>
+    </div>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    const urlInput = document.getElementById('youtubeUrl');
+    const loadBtn = document.getElementById('loadBtn');
+    const captionsEl = document.getElementById('captions');
+    const statusEl = document.getElementById('status');
+
+    let player;
+    let captions = [];
+    let activeCaptionId = null;
+    let syncTimer = null;
+    const CAPTION_ADVANCE_SEC = 1.50;
+
+    function formatTime(totalSeconds) {
+      const sec = Math.max(0, Math.floor(totalSeconds));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h > 0) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.style.color = isError ? '#b91c1c' : '#64748b';
+    }
+
+    function renderCaptions() {
+      captionsEl.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+
+      captions.forEach((item) => {
+        const row = document.createElement('button');
+        row.className = 'caption-row';
+        row.dataset.id = String(item.id);
+        row.dataset.start = String(item.start);
+
+        row.innerHTML = `
+          <span class="caption-time">${formatTime(item.start)}</span>
+          <span class="caption-text">${item.text}</span>
+        `;
+
+        row.addEventListener('click', () => {
+          if (!player || typeof player.seekTo !== 'function') return;
+          const target = Math.max(0, item.start - CAPTION_ADVANCE_SEC);
+          player.seekTo(target, true);
+          player.playVideo();
+          setActiveCaption(item.id, true);
+        });
+
+        fragment.appendChild(row);
+      });
+
+      captionsEl.appendChild(fragment);
+    }
+
+    function setActiveCaption(id, forceScroll = false) {
+      if (id === activeCaptionId && !forceScroll) return;
+
+      const prev = activeCaptionId !== null ? captionsEl.querySelector(`.caption-row[data-id="${activeCaptionId}"]`) : null;
+      if (prev) prev.classList.remove('active');
+
+      activeCaptionId = id;
+      const current = captionsEl.querySelector(`.caption-row[data-id="${id}"]`);
+      if (!current) return;
+
+      current.classList.add('active');
+      const needScroll = forceScroll || current.offsetTop < captionsEl.scrollTop || current.offsetTop + current.offsetHeight > captionsEl.scrollTop + captionsEl.clientHeight;
+      if (needScroll) {
+        current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
+    function clearActiveCaption() {
+      if (activeCaptionId === null) return;
+      const prev = captionsEl.querySelector(`.caption-row[data-id="${activeCaptionId}"]`);
+      if (prev) prev.classList.remove('active');
+      activeCaptionId = null;
+    }
+
+    function findActiveCaptionByTime(time) {
+      const adjustedTime = time + CAPTION_ADVANCE_SEC;
+      for (let i = 0; i < captions.length; i += 1) {
+        const c = captions[i];
+        const end = c.end || (c.start + c.duration) || c.start + 3;
+        if (adjustedTime >= c.start && adjustedTime < end) return c;
+      }
+      return null;
+    }
+
+    function startSync() {
+      stopSync();
+      syncTimer = window.setInterval(() => {
+        if (!player || typeof player.getCurrentTime !== 'function' || captions.length === 0) return;
+        const currentTime = player.getCurrentTime();
+        const active = findActiveCaptionByTime(currentTime);
+        if (active) {
+          setActiveCaption(active.id);
+        } else {
+          clearActiveCaption();
+        }
+      }, 250);
+    }
+
+    function stopSync() {
+      if (syncTimer) {
+        window.clearInterval(syncTimer);
+        syncTimer = null;
+      }
+    }
+
+    function loadVideo(videoId) {
+      if (!player) {
+        player = new YT.Player('player', {
+          videoId,
+          playerVars: {
+            rel: 0,
+            origin: window.location.origin,
+          },
+        });
+      } else {
+        player.loadVideoById(videoId);
+      }
+    }
+
+    async function fetchTranscript() {
+      const url = urlInput.value.trim();
+      if (!url) {
+        setStatus('請先輸入 YouTube 影片網址', true);
+        return;
+      }
+
+      loadBtn.disabled = true;
+      setStatus('正在取得字幕...');
+
+      try {
+        const response = await fetch(`/api/transcript?url=${encodeURIComponent(url)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || '讀取字幕失敗');
+        }
+
+        captions = data.captions || [];
+        if (captions.length === 0) {
+          throw new Error('字幕內容為空');
+        }
+
+        renderCaptions();
+        loadVideo(data.videoId);
+        activeCaptionId = null;
+        startSync();
+        const sourceLabel = data.isAutoGenerated ? '自動字幕' : '人工字幕';
+        setStatus(`已載入 ${captions.length} 句字幕（${data.language} / ${sourceLabel}）`);
+      } catch (err) {
+        setStatus(err.message || '發生錯誤', true);
+      } finally {
+        loadBtn.disabled = false;
+      }
+    }
+
+    window.onYouTubeIframeAPIReady = function onYouTubeIframeAPIReady() {
+      // Player will be created after user loads a video.
+    };
+
+    loadBtn.addEventListener('click', fetchTranscript);
+    urlInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        fetchTranscript();
+      }
+    });
+
+    setStatus('貼上 YouTube 影片網址後，按「讀取字幕」');
+  </script>
+</body>
+</html>
