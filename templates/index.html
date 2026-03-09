@@ -26,24 +26,34 @@
     }
 
     .app {
-      max-width: 1280px;
+      max-width: 1366px;
       margin: 0 auto;
-      padding: 20px;
+      padding:
+        max(16px, env(safe-area-inset-top))
+        max(16px, env(safe-area-inset-right))
+        max(16px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
     }
 
     .toolbar {
       display: flex;
       gap: 10px;
       margin-bottom: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: linear-gradient(to bottom, rgba(243, 246, 251, 0.95), rgba(243, 246, 251, 0.82));
+      backdrop-filter: blur(6px);
+      padding: 8px 0;
     }
 
     .toolbar input {
       flex: 1;
-      height: 44px;
+      height: 52px;
       border: 1px solid var(--line);
       border-radius: 10px;
-      padding: 0 12px;
-      font-size: 15px;
+      padding: 0 14px;
+      font-size: 16px;
       outline: none;
     }
 
@@ -53,14 +63,16 @@
     }
 
     .toolbar button {
-      height: 44px;
+      height: 52px;
       border: none;
       border-radius: 10px;
       background: var(--accent);
       color: #fff;
-      font-size: 15px;
-      padding: 0 18px;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 0 20px;
       cursor: pointer;
+      touch-action: manipulation;
     }
 
     .toolbar button:disabled {
@@ -89,9 +101,10 @@
     }
 
     .captions {
-      height: min(72vh, 700px);
+      height: clamp(420px, 68vh, 780px);
       overflow-y: auto;
       padding: 8px;
+      -webkit-overflow-scrolling: touch;
     }
 
     .caption-row {
@@ -105,6 +118,8 @@
       cursor: pointer;
       transition: background-color 0.2s, border-color 0.2s;
       display: block;
+      min-height: 84px;
+      touch-action: manipulation;
     }
 
     .caption-row:hover {
@@ -121,14 +136,14 @@
       display: block;
       color: var(--muted);
       font-variant-numeric: tabular-nums;
-      font-size: 13px;
+      font-size: 14px;
       margin-bottom: 6px;
     }
 
     .caption-text {
       display: block;
-      font-size: 16px;
-      line-height: 1.45;
+      font-size: 18px;
+      line-height: 1.5;
       word-break: break-word;
     }
 
@@ -146,6 +161,29 @@
 
       .captions {
         height: 48vh;
+      }
+    }
+
+    /* iPad Air 13" portrait (1024x1366 CSS px) */
+    @media (min-width: 961px) and (max-width: 1100px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .captions {
+        height: 46vh;
+      }
+    }
+
+    /* iPad Air 13" landscape (1366x1024 CSS px) */
+    @media (min-width: 1101px) and (max-width: 1400px) {
+      .app {
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+      }
+
+      .layout {
+        grid-template-columns: 1.7fr 1fr;
       }
     }
   </style>
