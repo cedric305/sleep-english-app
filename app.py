@@ -1,13 +1,34 @@
 ﻿from __future__ import annotations
 
+import json
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from yt_dlp import YoutubeDL
 
 app = Flask(__name__)
+
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+CLIPS_DIR = DATA_DIR / "clips"
+LIBRARY_FILE = DATA_DIR / "library.json"
+
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+CLIPS_DIR.mkdir(parents=True, exist_ok=True)
+if not LIBRARY_FILE.exists():
+    LIBRARY_FILE.write_text("[]", encoding="utf-8")
+
+library_lock = threading.Lock()
 
 
 def extract_video_id(youtube_url: str) -> str | None:
@@ -41,7 +62,6 @@ def clean_caption_text(text: str) -> str:
 
 
 def visual_text_length(text: str) -> int:
-    # CJK characters usually occupy wider width; use weighted length for UI heuristics.
     length = 0
     for ch in text:
         if "\u4e00" <= ch <= "\u9fff":
@@ -51,20 +71,11 @@ def visual_text_length(text: str) -> int:
     return length
 
 
-def is_sentence_end(text: str) -> bool:
-    stripped = text.rstrip()
-    if not stripped:
-        return False
-    # Include paired punctuation to better detect sentence boundaries in mixed languages.
-    return bool(re.search(r'[.!?。！？…]["\'」』）)\]]*$', stripped))
-
-
 def split_text_fragments(text: str) -> list[tuple[str, int, int, bool]]:
     fragments: list[tuple[str, int, int, bool]] = []
     if not text:
         return fragments
 
-    # Keep trailing quote/bracket with sentence-ending punctuation.
     end_pattern = re.compile(r'[.!?。！？…]+["\'”’」』）)\]]*')
 
     def is_abbreviation_period(prefix: str) -> bool:
@@ -150,14 +161,7 @@ def chunk_to_timed_segments(chunk: dict) -> list[dict]:
         )
 
     if not segments:
-        segments.append(
-            {
-                "start": start,
-                "end": end,
-                "text": text,
-                "is_sentence_end": False,
-            }
-        )
+        segments.append({"start": start, "end": end, "text": text, "is_sentence_end": False})
 
     return segments
 
@@ -231,7 +235,7 @@ def merge_caption_chunks(chunks: list[dict]) -> list[dict]:
         rows.append(
             {
                 "id": idx,
-                "start": row["start"],  # sentence first word timestamp
+                "start": row["start"],
                 "duration": row["duration"],
                 "end": row["end"],
                 "text": row["text"],
@@ -241,16 +245,7 @@ def merge_caption_chunks(chunks: list[dict]) -> list[dict]:
 
 
 def choose_caption_track(info: dict) -> tuple[str, bool, str] | None:
-    preferred_langs = [
-        "en",
-        "en-US",
-        "en-GB",
-        "zh-Hant",
-        "zh-TW",
-        "zh-Hans",
-        "zh-CN",
-        "zh",
-    ]
+    preferred_langs = ["en", "en-US", "en-GB", "zh-Hant", "zh-TW", "zh-Hans", "zh-CN", "zh"]
 
     def pick_from_tracks(tracks: dict[str, list[dict]]) -> tuple[str, str] | None:
         for lang in preferred_langs:
@@ -309,16 +304,96 @@ def parse_json3_captions(payload: dict) -> list[dict]:
         start = float(start_ms) / 1000.0
         duration = float(event.get("dDurationMs", 0)) / 1000.0
 
-        chunks.append(
-            {
-                "start": start,
-                "duration": duration,
-                "end": start + duration,
-                "text": text,
-            }
-        )
+        chunks.append({"start": start, "duration": duration, "end": start + duration, "text": text})
 
     return merge_caption_chunks(chunks)
+
+
+def load_library_items() -> list[dict]:
+    with library_lock:
+        try:
+            items = json.loads(LIBRARY_FILE.read_text(encoding="utf-8"))
+            if isinstance(items, list):
+                return items
+            return []
+        except json.JSONDecodeError:
+            return []
+
+
+def save_library_items(items: list[dict]) -> None:
+    with library_lock:
+        LIBRARY_FILE.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def serialize_library_item(item: dict) -> dict:
+    return {
+        "id": item["id"],
+        "videoId": item["videoId"],
+        "videoTitle": item.get("videoTitle", ""),
+        "start": item["start"],
+        "end": item["end"],
+        "text": item["text"],
+        "createdAt": item["createdAt"],
+        "audioUrl": f"/api/library/audio/{item['id']}",
+    }
+
+
+def fmt_seconds(seconds: float) -> str:
+    ms = int(round(max(0.0, seconds) * 1000))
+    s = (ms // 1000) % 60
+    m = (ms // 60000) % 60
+    h = ms // 3600000
+    mm = ms % 1000
+    return f"{h:02d}:{m:02d}:{s:02d}.{mm:03d}"
+
+
+def create_audio_clip(video_id: str, start: float, end: float, clip_id: str) -> Path:
+    ffmpeg_path = shutil.which("ffmpeg")
+    if not ffmpeg_path:
+        raise RuntimeError("找不到 ffmpeg，請先安裝 ffmpeg 才能儲存錄音檔")
+
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    clip_start = max(0.0, start)
+    clip_end = max(clip_start + 0.6, end)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        output_template = tmp_dir / "clip.%(ext)s"
+        cmd = [
+            sys.executable,
+            "-m",
+            "yt_dlp",
+            "-f",
+            "bestaudio/best",
+            "--no-playlist",
+            "--no-warnings",
+            "--force-overwrites",
+            "--extract-audio",
+            "--audio-format",
+            "mp3",
+            "--audio-quality",
+            "0",
+            "--download-sections",
+            f"*{fmt_seconds(clip_start)}-{fmt_seconds(clip_end)}",
+            "-o",
+            str(output_template),
+            url,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(f"音檔截取失敗: {(proc.stderr or proc.stdout).strip()}")
+
+        candidates = sorted(
+            [p for p in tmp_dir.iterdir() if p.is_file() and p.suffix.lower() in {".mp3", ".m4a", ".webm", ".opus"}],
+            key=lambda p: p.stat().st_size,
+            reverse=True,
+        )
+        if not candidates:
+            raise RuntimeError("音檔截取失敗: 找不到輸出檔案")
+
+        dest = CLIPS_DIR / f"{clip_id}.mp3"
+        shutil.copyfile(candidates[0], dest)
+        return dest
 
 
 @app.route("/")
@@ -353,6 +428,7 @@ def get_transcript():
         return jsonify(
             {
                 "videoId": video_id,
+                "videoTitle": info.get("title") or "",
                 "captions": captions,
                 "language": lang,
                 "isAutoGenerated": is_auto,
@@ -362,6 +438,89 @@ def get_transcript():
         return jsonify({"error": f"下載字幕失敗: {exc}"}), 500
     except Exception as exc:
         return jsonify({"error": f"取得字幕失敗: {exc}"}), 500
+
+
+@app.route("/api/library", methods=["GET"])
+def list_library():
+    items = load_library_items()
+    serialized = [serialize_library_item(x) for x in items]
+    return jsonify({"items": serialized})
+
+
+@app.route("/api/library", methods=["POST"])
+def create_library_item():
+    payload = request.get_json(silent=True) or {}
+
+    video_id = (payload.get("videoId") or "").strip()
+    text = clean_caption_text(payload.get("text") or "")
+
+    try:
+        start = float(payload.get("start"))
+        end = float(payload.get("end"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "start/end 格式錯誤"}), 400
+
+    if not video_id or len(video_id) != 11:
+        return jsonify({"error": "videoId 無效"}), 400
+    if not text:
+        return jsonify({"error": "字幕內容不可為空"}), 400
+
+    start = max(0.0, start)
+    end = max(start + 0.6, end)
+
+    clip_id = uuid.uuid4().hex
+    try:
+        create_audio_clip(video_id=video_id, start=start, end=end, clip_id=clip_id)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    item = {
+        "id": clip_id,
+        "videoId": video_id,
+        "videoTitle": clean_caption_text(payload.get("videoTitle") or ""),
+        "start": start,
+        "end": end,
+        "text": text,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+    }
+
+    items = load_library_items()
+    items.insert(0, item)
+    save_library_items(items)
+    return jsonify({"item": serialize_library_item(item)})
+
+
+@app.route("/api/library/<clip_id>", methods=["DELETE"])
+def delete_library_item(clip_id: str):
+    items = load_library_items()
+    exists = any(x.get("id") == clip_id for x in items)
+    if not exists:
+        return jsonify({"error": "找不到片段"}), 404
+
+    items = [x for x in items if x.get("id") != clip_id]
+    save_library_items(items)
+
+    audio_path = CLIPS_DIR / f"{clip_id}.mp3"
+    if audio_path.exists():
+        audio_path.unlink()
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/library/clear", methods=["POST"])
+def clear_library():
+    save_library_items([])
+    for path in CLIPS_DIR.glob("*.mp3"):
+        path.unlink(missing_ok=True)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/library/audio/<clip_id>")
+def serve_library_audio(clip_id: str):
+    audio_path = CLIPS_DIR / f"{clip_id}.mp3"
+    if not audio_path.exists():
+        return jsonify({"error": "找不到音檔"}), 404
+    return send_from_directory(CLIPS_DIR, audio_path.name, mimetype="audio/mpeg", as_attachment=False)
 
 
 if __name__ == "__main__":

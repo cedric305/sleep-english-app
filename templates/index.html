@@ -13,6 +13,7 @@
       --line: #e2e8f0;
       --accent: #ef4444;
       --accent-soft: #fee2e2;
+      --chip: #e2e8f0;
     }
 
     * { box-sizing: border-box; }
@@ -35,16 +36,48 @@
         max(16px, env(safe-area-inset-left));
     }
 
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: linear-gradient(to bottom, rgba(243, 246, 251, 0.95), rgba(243, 246, 251, 0.82));
+      backdrop-filter: blur(6px);
+      padding: 8px 0;
+    }
+
+    .tab-btn {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      color: #334155;
+      height: 44px;
+      padding: 0 16px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      border-color: #fca5a5;
+      background: var(--accent-soft);
+      color: #b91c1c;
+      font-weight: 600;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
     .toolbar {
       display: flex;
       gap: 10px;
       margin-bottom: 16px;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: linear-gradient(to bottom, rgba(243, 246, 251, 0.95), rgba(243, 246, 251, 0.82));
-      backdrop-filter: blur(6px);
-      padding: 8px 0;
     }
 
     .toolbar input {
@@ -82,7 +115,7 @@
 
     .layout {
       display: grid;
-      grid-template-columns: 1.6fr 1fr;
+      grid-template-columns: 1.7fr 1fr;
       gap: 16px;
     }
 
@@ -154,17 +187,144 @@
       min-height: 20px;
     }
 
-    @media (max-width: 960px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-
-      .captions {
-        height: 48vh;
-      }
+    .library-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 10px;
     }
 
-    /* iPad Air 13" portrait (1024x1366 CSS px) */
+    .library-audio {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .chip {
+      background: var(--chip);
+      border-radius: 999px;
+      padding: 4px 10px;
+      color: #334155;
+      font-size: 13px;
+    }
+
+    .muted-btn {
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #fff;
+      color: #334155;
+      font-size: 14px;
+      height: 40px;
+      padding: 0 12px;
+      cursor: pointer;
+    }
+
+    .library-list {
+      max-height: 74vh;
+      overflow-y: auto;
+      padding: 10px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .library-item {
+      border: 1px solid #dbe5f1;
+      border-radius: 12px;
+      padding: 10px;
+      margin: 10px 0;
+      background: #fff;
+    }
+
+    .library-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .library-text {
+      font-size: 17px;
+      line-height: 1.45;
+      margin-bottom: 10px;
+    }
+
+    .library-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #fff;
+      color: #1f2937;
+      font-size: 14px;
+      height: 40px;
+      padding: 0 12px;
+      cursor: pointer;
+    }
+
+    .action-btn.primary {
+      border-color: #fca5a5;
+      background: #fff1f2;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 30px 12px;
+      font-size: 15px;
+    }
+
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.35);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 50;
+      padding: 14px;
+    }
+
+    .sheet-backdrop.open {
+      display: flex;
+    }
+
+    .sheet {
+      width: min(680px, 100%);
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #dbe5f1;
+      padding: 14px;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.24);
+    }
+
+    .sheet h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    .sheet-caption {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px;
+      background: #f8fafc;
+      margin-bottom: 10px;
+      font-size: 16px;
+      line-height: 1.4;
+    }
+
+    .sheet-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
     @media (min-width: 961px) and (max-width: 1100px) {
       .layout {
         grid-template-columns: 1fr;
@@ -175,37 +335,73 @@
       }
     }
 
-    /* iPad Air 13" landscape (1366x1024 CSS px) */
-    @media (min-width: 1101px) and (max-width: 1400px) {
-      .app {
-        padding-left: max(20px, env(safe-area-inset-left));
-        padding-right: max(20px, env(safe-area-inset-right));
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
       }
 
-      .layout {
-        grid-template-columns: 1.7fr 1fr;
+      .captions {
+        height: 48vh;
+      }
+
+      .toolbar {
+        flex-direction: column;
+      }
+
+      .toolbar button {
+        width: 100%;
       }
     }
   </style>
 </head>
 <body>
   <div class="app">
-    <div class="toolbar">
-      <input id="youtubeUrl" type="text" placeholder="貼上 YouTube 影片網址，例如：https://www.youtube.com/watch?v=..." />
-      <button id="loadBtn">讀取字幕</button>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="studyTab">字幕學習</button>
+      <button class="tab-btn" data-tab="libraryTab">錄音檔生字庫</button>
     </div>
 
-    <div class="layout">
-      <div class="panel">
-        <div id="player"></div>
+    <section id="studyTab" class="tab-panel active">
+      <div class="toolbar">
+        <input id="youtubeUrl" type="text" placeholder="貼上 YouTube 影片網址，例如：https://www.youtube.com/watch?v=..." />
+        <button id="loadBtn">讀取字幕</button>
       </div>
 
+      <div class="layout">
+        <div class="panel">
+          <div id="player"></div>
+        </div>
+
+        <div class="panel">
+          <div id="captions" class="captions"></div>
+        </div>
+      </div>
+
+      <div id="status" class="status"></div>
+    </section>
+
+    <section id="libraryTab" class="tab-panel">
+      <div class="library-head">
+        <span id="libraryCount" class="chip">0 筆片段</span>
+        <button id="clearLibraryBtn" class="muted-btn" type="button">清空生字庫</button>
+      </div>
+      <audio id="libraryAudio" class="library-audio" controls preload="none"></audio>
       <div class="panel">
-        <div id="captions" class="captions"></div>
+        <div id="libraryList" class="library-list"></div>
+      </div>
+      <div id="libraryStatus" class="status"></div>
+    </section>
+  </div>
+
+  <div id="clipSheetBackdrop" class="sheet-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="sheet">
+      <h3>字幕片段選項</h3>
+      <div id="sheetCaptionText" class="sheet-caption"></div>
+      <div class="sheet-actions">
+        <button id="sheetSaveBtn" class="action-btn primary" type="button">儲存到錄音檔生字庫</button>
+        <button id="sheetCancelBtn" class="action-btn" type="button">取消</button>
       </div>
     </div>
-
-    <div id="status" class="status"></div>
   </div>
 
   <script src="https://www.youtube.com/iframe_api"></script>
@@ -214,12 +410,34 @@
     const loadBtn = document.getElementById('loadBtn');
     const captionsEl = document.getElementById('captions');
     const statusEl = document.getElementById('status');
+    const tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
+    const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
+
+    const libraryAudioEl = document.getElementById('libraryAudio');
+    const libraryListEl = document.getElementById('libraryList');
+    const libraryCountEl = document.getElementById('libraryCount');
+    const libraryStatusEl = document.getElementById('libraryStatus');
+    const clearLibraryBtn = document.getElementById('clearLibraryBtn');
+
+    const clipSheetBackdrop = document.getElementById('clipSheetBackdrop');
+    const sheetCaptionTextEl = document.getElementById('sheetCaptionText');
+    const sheetSaveBtn = document.getElementById('sheetSaveBtn');
+    const sheetCancelBtn = document.getElementById('sheetCancelBtn');
+
+    const CAPTION_ADVANCE_SEC = 1.50;
+    const LONG_PRESS_MS = 520;
 
     let player;
     let captions = [];
     let activeCaptionId = null;
     let syncTimer = null;
-    const CAPTION_ADVANCE_SEC = 1.50;
+    let currentVideoId = null;
+    let currentVideoTitle = '';
+
+    let longPressTimer = null;
+    let longPressTriggered = false;
+    let sheetCaption = null;
+    let clipLibrary = [];
 
     function formatTime(totalSeconds) {
       const sec = Math.max(0, Math.floor(totalSeconds));
@@ -237,6 +455,86 @@
       statusEl.style.color = isError ? '#b91c1c' : '#64748b';
     }
 
+    function setLibraryStatus(message, isError = false) {
+      libraryStatusEl.textContent = message;
+      libraryStatusEl.style.color = isError ? '#b91c1c' : '#64748b';
+    }
+
+    function switchTab(tabId) {
+      tabButtons.forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+      });
+      tabPanels.forEach((panel) => {
+        panel.classList.toggle('active', panel.id === tabId);
+      });
+    }
+
+    function initTabs() {
+      tabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          switchTab(btn.dataset.tab);
+        });
+      });
+    }
+
+    function closeClipSheet() {
+      clipSheetBackdrop.classList.remove('open');
+      clipSheetBackdrop.setAttribute('aria-hidden', 'true');
+      sheetCaption = null;
+    }
+
+    function openClipSheet(item) {
+      sheetCaption = item;
+      sheetCaptionTextEl.textContent = `[${formatTime(item.start)}] ${item.text}`;
+      clipSheetBackdrop.classList.add('open');
+      clipSheetBackdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    function clearLongPressTimer() {
+      if (longPressTimer) {
+        window.clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }
+
+    function bindCaptionInteraction(row, item) {
+      row.addEventListener('pointerdown', (event) => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        longPressTriggered = false;
+        clearLongPressTimer();
+        longPressTimer = window.setTimeout(() => {
+          longPressTriggered = true;
+          openClipSheet(item);
+        }, LONG_PRESS_MS);
+      });
+
+      row.addEventListener('pointerup', clearLongPressTimer);
+      row.addEventListener('pointercancel', clearLongPressTimer);
+      row.addEventListener('pointerleave', clearLongPressTimer);
+
+      row.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        longPressTriggered = true;
+        openClipSheet(item);
+      });
+
+      row.addEventListener('click', () => {
+        if (longPressTriggered) {
+          longPressTriggered = false;
+          return;
+        }
+        jumpToCaption(item);
+      });
+    }
+
+    function jumpToCaption(item) {
+      if (!player || typeof player.seekTo !== 'function') return;
+      const target = Math.max(0, item.start - CAPTION_ADVANCE_SEC);
+      player.seekTo(target, true);
+      player.playVideo();
+      setActiveCaption(item.id, true);
+    }
+
     function renderCaptions() {
       captionsEl.innerHTML = '';
       const fragment = document.createDocumentFragment();
@@ -245,21 +543,13 @@
         const row = document.createElement('button');
         row.className = 'caption-row';
         row.dataset.id = String(item.id);
-        row.dataset.start = String(item.start);
 
         row.innerHTML = `
           <span class="caption-time">${formatTime(item.start)}</span>
           <span class="caption-text">${item.text}</span>
         `;
 
-        row.addEventListener('click', () => {
-          if (!player || typeof player.seekTo !== 'function') return;
-          const target = Math.max(0, item.start - CAPTION_ADVANCE_SEC);
-          player.seekTo(target, true);
-          player.playVideo();
-          setActiveCaption(item.id, true);
-        });
-
+        bindCaptionInteraction(row, item);
         fragment.appendChild(row);
       });
 
@@ -322,6 +612,7 @@
     }
 
     function loadVideo(videoId) {
+      currentVideoId = videoId;
       if (!player) {
         player = new YT.Player('player', {
           videoId,
@@ -333,6 +624,110 @@
       } else {
         player.loadVideoById(videoId);
       }
+    }
+
+    async function fetchLibrary() {
+      const response = await fetch('/api/library');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '讀取生字庫失敗');
+      clipLibrary = data.items || [];
+      renderLibrary();
+    }
+
+    async function saveCaptionToLibrary(item) {
+      if (!currentVideoId) {
+        setLibraryStatus('尚未載入影片，無法儲存片段', true);
+        return;
+      }
+
+      sheetSaveBtn.disabled = true;
+      sheetCancelBtn.disabled = true;
+      setLibraryStatus('正在截取錄音檔，請稍候...');
+
+      try {
+        const response = await fetch('/api/library', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoId: currentVideoId,
+            videoTitle: currentVideoTitle,
+            start: item.start,
+            end: item.end || (item.start + item.duration) || (item.start + 3),
+            text: item.text,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '儲存失敗');
+
+        clipLibrary.unshift(data.item);
+        renderLibrary();
+        setLibraryStatus('已儲存到錄音檔生字庫');
+      } catch (err) {
+        setLibraryStatus(err.message || '儲存失敗', true);
+      } finally {
+        sheetSaveBtn.disabled = false;
+        sheetCancelBtn.disabled = false;
+      }
+    }
+
+    function renderLibrary() {
+      libraryCountEl.textContent = `${clipLibrary.length} 筆片段`;
+
+      if (clipLibrary.length === 0) {
+        libraryListEl.innerHTML = '<div class="empty">目前沒有片段。到「字幕學習」長按某句字幕即可加入。</div>';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+
+      clipLibrary.forEach((clip) => {
+        const item = document.createElement('div');
+        item.className = 'library-item';
+
+        const videoLabel = clip.videoTitle ? clip.videoTitle : clip.videoId;
+        item.innerHTML = `
+          <div class="library-meta">
+            <span>${formatTime(clip.start)} - ${formatTime(clip.end)}</span>
+            <span>影片：${videoLabel}</span>
+          </div>
+          <div class="library-text">${clip.text}</div>
+          <div class="library-actions">
+            <button class="action-btn primary" type="button" data-action="play">播放錄音檔</button>
+            <button class="action-btn" type="button" data-action="remove">刪除</button>
+          </div>
+        `;
+
+        const playBtn = item.querySelector('[data-action="play"]');
+        const removeBtn = item.querySelector('[data-action="remove"]');
+
+        playBtn.addEventListener('click', async () => {
+          try {
+            libraryAudioEl.src = `${clip.audioUrl}?t=${Date.now()}`;
+            await libraryAudioEl.play();
+            setLibraryStatus('正在播放錄音檔');
+          } catch {
+            setLibraryStatus('播放失敗，請確認音檔仍存在', true);
+          }
+        });
+
+        removeBtn.addEventListener('click', async () => {
+          try {
+            const response = await fetch(`/api/library/${clip.id}`, { method: 'DELETE' });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || '刪除失敗');
+            clipLibrary = clipLibrary.filter((x) => x.id !== clip.id);
+            renderLibrary();
+            setLibraryStatus('已刪除片段');
+          } catch (err) {
+            setLibraryStatus(err.message || '刪除失敗', true);
+          }
+        });
+
+        fragment.appendChild(item);
+      });
+
+      libraryListEl.innerHTML = '';
+      libraryListEl.appendChild(fragment);
     }
 
     async function fetchTranscript() {
@@ -354,6 +749,9 @@
         }
 
         captions = data.captions || [];
+        currentVideoId = data.videoId;
+        currentVideoTitle = data.videoTitle || '';
+
         if (captions.length === 0) {
           throw new Error('字幕內容為空');
         }
@@ -375,6 +773,38 @@
       // Player will be created after user loads a video.
     };
 
+    sheetSaveBtn.addEventListener('click', async () => {
+      if (!sheetCaption) return;
+      await saveCaptionToLibrary(sheetCaption);
+      closeClipSheet();
+      switchTab('libraryTab');
+    });
+
+    sheetCancelBtn.addEventListener('click', closeClipSheet);
+
+    clipSheetBackdrop.addEventListener('click', (event) => {
+      if (event.target === clipSheetBackdrop) {
+        closeClipSheet();
+      }
+    });
+
+    clearLibraryBtn.addEventListener('click', async () => {
+      if (!window.confirm('確定要清空錄音檔生字庫嗎？')) return;
+      try {
+        const response = await fetch('/api/library/clear', { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '清空失敗');
+        clipLibrary = [];
+        renderLibrary();
+        libraryAudioEl.pause();
+        libraryAudioEl.removeAttribute('src');
+        libraryAudioEl.load();
+        setLibraryStatus('已清空生字庫');
+      } catch (err) {
+        setLibraryStatus(err.message || '清空失敗', true);
+      }
+    });
+
     loadBtn.addEventListener('click', fetchTranscript);
     urlInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -383,7 +813,9 @@
       }
     });
 
-    setStatus('貼上 YouTube 影片網址後，按「讀取字幕」');
+    initTabs();
+    fetchLibrary().catch((err) => setLibraryStatus(err.message || '讀取生字庫失敗', true));
+    setStatus('貼上 YouTube 影片網址後，按「讀取字幕」。長按字幕可加入生字庫。');
   </script>
 </body>
 </html>
