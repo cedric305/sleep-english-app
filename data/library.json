@@ -1,1 +1,29 @@
-[]
+[
+  {
+    "id": "14b09d101dc74ed5abcfbebcb4eae8de",
+    "videoId": "pkSxISewcw8",
+    "videoTitle": "STOP Using Bypass Permissions, Use This New Feature Instead",
+    "start": 63.22,
+    "end": 69.864,
+    "text": "But it's called dangerously skip permissions for a reason because at the end of the day, if you're not watching it, it could go do anything.",
+    "createdAt": "2026-03-26T06:51:06.817290+00:00"
+  },
+  {
+    "id": "99a19dead2624f91acc001e0d1f731d5",
+    "videoId": "pkSxISewcw8",
+    "videoTitle": "STOP Using Bypass Permissions, Use This New Feature Instead",
+    "start": 41.58,
+    "end": 48.6,
+    "text": "And it's not just about the writing functions. Sometimes it'll stop your workflow and say, \"Hey, can I do this web fetch or can I run this bash command?\"",
+    "createdAt": "2026-03-26T06:50:36.073502+00:00"
+  },
+  {
+    "id": "39874c2d57b04dccaeb6f571450d78b4",
+    "videoId": "pkSxISewcw8",
+    "videoTitle": "STOP Using Bypass Permissions, Use This New Feature Instead",
+    "start": 37.95425641025641,
+    "end": 42.2,
+    "text": "And as you can see, it's popping it up again and stopping my session because it has to make two edits.",
+    "createdAt": "2026-03-26T06:50:27.468804+00:00"
+  }
+]

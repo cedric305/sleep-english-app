@@ -4,7 +4,6 @@ import json
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import threading
 import uuid
@@ -358,41 +357,71 @@ def create_audio_clip(video_id: str, start: float, end: float, clip_id: str) -> 
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
-        output_template = tmp_dir / "clip.%(ext)s"
-        cmd = [
-            sys.executable,
-            "-m",
-            "yt_dlp",
-            "-f",
-            "bestaudio/best",
-            "--no-playlist",
-            "--no-warnings",
-            "--force-overwrites",
-            "--extract-audio",
-            "--audio-format",
-            "mp3",
-            "--audio-quality",
-            "0",
-            "--download-sections",
-            f"*{fmt_seconds(clip_start)}-{fmt_seconds(clip_end)}",
-            "-o",
-            str(output_template),
-            url,
-        ]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
-            raise RuntimeError(f"音檔截取失敗: {(proc.stderr or proc.stdout).strip()}")
+        output_template = tmp_dir / "source.%(ext)s"
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "outtmpl": str(output_template),
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+            "overwrites": True,
+        }
 
-        candidates = sorted(
-            [p for p in tmp_dir.iterdir() if p.is_file() and p.suffix.lower() in {".mp3", ".m4a", ".webm", ".opus"}],
-            key=lambda p: p.stat().st_size,
-            reverse=True,
-        )
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            requested_downloads = info.get("requested_downloads") or []
+
+            candidates = []
+            for item in requested_downloads:
+                filepath = item.get("filepath")
+                if filepath:
+                    path = Path(filepath)
+                    if path.exists():
+                        candidates.append(path)
+
+            if not candidates:
+                prepared = Path(ydl.prepare_filename(info))
+                if prepared.exists():
+                    candidates.append(prepared)
+
+            if not candidates:
+                candidates = sorted(
+                    [p for p in tmp_dir.iterdir() if p.is_file()],
+                    key=lambda p: p.stat().st_size,
+                    reverse=True,
+                )
+
         if not candidates:
-            raise RuntimeError("音檔截取失敗: 找不到輸出檔案")
+            raise RuntimeError("音檔下載失敗: 找不到來源音訊檔")
+
+        source_audio = candidates[0]
 
         dest = CLIPS_DIR / f"{clip_id}.mp3"
-        shutil.copyfile(candidates[0], dest)
+        ffmpeg_cmd = [
+            ffmpeg_path,
+            "-y",
+            "-i",
+            str(source_audio),
+            "-ss",
+            f"{clip_start:.3f}",
+            "-to",
+            f"{clip_end:.3f}",
+            "-vn",
+            "-map",
+            "a:0",
+            "-acodec",
+            "libmp3lame",
+            "-q:a",
+            "2",
+            str(dest),
+        ]
+        proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(f"音檔裁切失敗: {(proc.stderr or proc.stdout).strip()}")
+
+        if not dest.exists():
+            raise RuntimeError("音檔裁切失敗: 找不到輸出檔案")
+
         return dest
 
 

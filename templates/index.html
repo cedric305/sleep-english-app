@@ -425,6 +425,7 @@
     const sheetCancelBtn = document.getElementById('sheetCancelBtn');
 
     const CAPTION_ADVANCE_SEC = 1.50;
+    const LIBRARY_CLIP_TAIL_SEC = 0.60;
     const LONG_PRESS_MS = 520;
 
     let player;
@@ -533,6 +534,15 @@
       player.seekTo(target, true);
       player.playVideo();
       setActiveCaption(item.id, true);
+    }
+
+    function getClipRange(item) {
+      const rawStart = Number(item.start) || 0;
+      const rawEnd = Number(item.end) || (rawStart + Number(item.duration || 0)) || (rawStart + 3);
+      const duration = Math.max(0.6, rawEnd - rawStart);
+      const start = Math.max(0, rawStart - CAPTION_ADVANCE_SEC);
+      const end = Math.max(start + 0.6, start + duration + LIBRARY_CLIP_TAIL_SEC);
+      return { start, end };
     }
 
     function renderCaptions() {
@@ -645,14 +655,15 @@
       setLibraryStatus('正在截取錄音檔，請稍候...');
 
       try {
+        const clipRange = getClipRange(item);
         const response = await fetch('/api/library', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             videoId: currentVideoId,
             videoTitle: currentVideoTitle,
-            start: item.start,
-            end: item.end || (item.start + item.duration) || (item.start + 3),
+            start: clipRange.start,
+            end: clipRange.end,
             text: item.text,
           }),
         });
