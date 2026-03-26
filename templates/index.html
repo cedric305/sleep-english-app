@@ -38,6 +38,7 @@
 
     .tabs {
       display: flex;
+      flex-wrap: wrap;
       gap: 10px;
       margin-bottom: 12px;
       position: sticky;
@@ -49,6 +50,7 @@
     }
 
     .tab-btn {
+      flex: 1 1 180px;
       border: 1px solid var(--line);
       border-radius: 12px;
       background: #fff;
@@ -325,6 +327,156 @@
       flex-wrap: wrap;
     }
 
+    .word-page {
+      display: grid;
+      grid-template-columns: minmax(300px, 440px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .word-panel {
+      padding: 16px;
+    }
+
+    .word-panel h3 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    .word-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .word-field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .word-field label {
+      font-size: 14px;
+      color: #334155;
+      font-weight: 600;
+    }
+
+    .word-input,
+    .word-textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 16px;
+      outline: none;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .word-input {
+      min-height: 50px;
+    }
+
+    .word-textarea {
+      min-height: 110px;
+      resize: vertical;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+
+    .word-input:focus,
+    .word-textarea:focus {
+      border-color: #94a3b8;
+      box-shadow: 0 0 0 3px #e2e8f0;
+    }
+
+    .word-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .word-actions .toolbar-btn,
+    .word-actions .muted-btn {
+      min-height: 46px;
+      padding: 0 16px;
+    }
+
+    .toolbar-btn {
+      border: none;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .toolbar-btn:disabled,
+    .muted-btn:disabled,
+    .action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .word-list-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .word-list {
+      max-height: 76vh;
+      overflow-y: auto;
+      padding: 10px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .word-item {
+      border: 1px solid #dbe5f1;
+      border-radius: 14px;
+      padding: 14px;
+      margin: 10px 0;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .word-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .word-main {
+      min-width: 0;
+    }
+
+    .word-term {
+      font-size: 24px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .word-translation {
+      margin-top: 4px;
+      font-size: 18px;
+      color: #b91c1c;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .word-note {
+      margin-top: 8px;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #334155;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
     @media (min-width: 961px) and (max-width: 1100px) {
       .layout {
         grid-template-columns: 1fr;
@@ -332,6 +484,10 @@
 
       .captions {
         height: 46vh;
+      }
+
+      .word-page {
+        grid-template-columns: 1fr;
       }
     }
 
@@ -351,6 +507,23 @@
       .toolbar button {
         width: 100%;
       }
+
+      .word-page {
+        grid-template-columns: 1fr;
+      }
+
+      .word-top {
+        flex-direction: column;
+      }
+
+      .word-actions {
+        flex-direction: column;
+      }
+
+      .word-actions .toolbar-btn,
+      .word-actions .muted-btn {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -359,6 +532,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="studyTab">字幕學習</button>
       <button class="tab-btn" data-tab="libraryTab">錄音檔生字庫</button>
+      <button class="tab-btn" data-tab="wordTab">單字生字庫</button>
     </div>
 
     <section id="studyTab" class="tab-panel active">
@@ -391,6 +565,43 @@
       </div>
       <div id="libraryStatus" class="status"></div>
     </section>
+
+    <section id="wordTab" class="tab-panel">
+      <div class="word-page">
+        <div class="panel word-panel">
+          <h3 id="wordFormTitle">新增單字</h3>
+          <div class="word-form">
+            <div class="word-field">
+              <label for="wordInput">英文單字</label>
+              <input id="wordInput" class="word-input" type="text" autocomplete="off" />
+            </div>
+            <div class="word-field">
+              <label for="wordTranslationInput">中文翻譯</label>
+              <input id="wordTranslationInput" class="word-input" type="text" autocomplete="off" />
+            </div>
+            <div class="word-field">
+              <label for="wordNoteInput">備註</label>
+              <textarea id="wordNoteInput" class="word-textarea"></textarea>
+            </div>
+            <div class="word-actions">
+              <button id="translateWordBtn" class="muted-btn" type="button">自動翻譯</button>
+              <button id="saveWordBtn" class="toolbar-btn" type="button">加入單字生字庫</button>
+              <button id="cancelWordEditBtn" class="muted-btn" type="button" hidden>取消編輯</button>
+            </div>
+            <div id="wordStatus" class="status"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="word-panel">
+            <div class="word-list-head">
+              <span id="wordCount" class="chip">0 個單字</span>
+            </div>
+          </div>
+          <div id="wordList" class="word-list"></div>
+        </div>
+      </div>
+    </section>
   </div>
 
   <div id="clipSheetBackdrop" class="sheet-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
@@ -419,6 +630,17 @@
     const libraryStatusEl = document.getElementById('libraryStatus');
     const clearLibraryBtn = document.getElementById('clearLibraryBtn');
 
+    const wordFormTitleEl = document.getElementById('wordFormTitle');
+    const wordInputEl = document.getElementById('wordInput');
+    const wordTranslationInputEl = document.getElementById('wordTranslationInput');
+    const wordNoteInputEl = document.getElementById('wordNoteInput');
+    const translateWordBtn = document.getElementById('translateWordBtn');
+    const saveWordBtn = document.getElementById('saveWordBtn');
+    const cancelWordEditBtn = document.getElementById('cancelWordEditBtn');
+    const wordStatusEl = document.getElementById('wordStatus');
+    const wordCountEl = document.getElementById('wordCount');
+    const wordListEl = document.getElementById('wordList');
+
     const clipSheetBackdrop = document.getElementById('clipSheetBackdrop');
     const sheetCaptionTextEl = document.getElementById('sheetCaptionText');
     const sheetSaveBtn = document.getElementById('sheetSaveBtn');
@@ -439,6 +661,8 @@
     let longPressTriggered = false;
     let sheetCaption = null;
     let clipLibrary = [];
+    let wordLibrary = [];
+    let editingWordId = null;
 
     function formatTime(totalSeconds) {
       const sec = Math.max(0, Math.floor(totalSeconds));
@@ -459,6 +683,11 @@
     function setLibraryStatus(message, isError = false) {
       libraryStatusEl.textContent = message;
       libraryStatusEl.style.color = isError ? '#b91c1c' : '#64748b';
+    }
+
+    function setWordStatus(message, isError = false) {
+      wordStatusEl.textContent = message;
+      wordStatusEl.style.color = isError ? '#b91c1c' : '#64748b';
     }
 
     function switchTab(tabId) {
@@ -741,6 +970,221 @@
       libraryListEl.appendChild(fragment);
     }
 
+    function resetWordForm({ keepStatus = false } = {}) {
+      editingWordId = null;
+      wordFormTitleEl.textContent = '新增單字';
+      saveWordBtn.textContent = '加入單字生字庫';
+      cancelWordEditBtn.hidden = true;
+      wordInputEl.value = '';
+      wordTranslationInputEl.value = '';
+      wordNoteInputEl.value = '';
+      if (!keepStatus) {
+        setWordStatus('');
+      }
+    }
+
+    function fillWordForm(item) {
+      editingWordId = item.id;
+      wordFormTitleEl.textContent = '編輯單字';
+      saveWordBtn.textContent = '更新單字';
+      cancelWordEditBtn.hidden = false;
+      wordInputEl.value = item.word || '';
+      wordTranslationInputEl.value = item.translation || '';
+      wordNoteInputEl.value = item.note || '';
+      switchTab('wordTab');
+      wordInputEl.focus();
+      wordInputEl.select();
+      setWordStatus(`正在編輯 ${item.word}`);
+    }
+
+    async function fetchWordTranslation(word) {
+      const response = await fetch(`/api/words/translate?word=${encodeURIComponent(word)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '自動翻譯失敗');
+      return data.translation || '';
+    }
+
+    async function autoTranslateWord({ force = false } = {}) {
+      const word = wordInputEl.value.trim();
+      const currentTranslation = wordTranslationInputEl.value.trim();
+
+      if (!word) {
+        if (force) setWordStatus('請先輸入英文單字', true);
+        return '';
+      }
+      if (!force && currentTranslation) {
+        return currentTranslation;
+      }
+
+      translateWordBtn.disabled = true;
+      if (force) setWordStatus('正在查詢中文翻譯...');
+
+      try {
+        const translation = await fetchWordTranslation(word);
+        if (translation) {
+          wordTranslationInputEl.value = translation;
+          setWordStatus('已自動帶入中文翻譯');
+        }
+        return translation;
+      } catch (err) {
+        setWordStatus(err.message || '自動翻譯失敗', true);
+        return '';
+      } finally {
+        translateWordBtn.disabled = false;
+      }
+    }
+
+    async function fetchWords() {
+      const response = await fetch('/api/words');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '讀取單字生字庫失敗');
+      wordLibrary = data.items || [];
+      renderWords();
+    }
+
+    async function submitWord() {
+      const word = wordInputEl.value.trim();
+      let translation = wordTranslationInputEl.value.trim();
+      const note = wordNoteInputEl.value.trim();
+
+      if (!word) {
+        setWordStatus('請先輸入英文單字', true);
+        wordInputEl.focus();
+        return;
+      }
+
+      saveWordBtn.disabled = true;
+      translateWordBtn.disabled = true;
+      cancelWordEditBtn.disabled = true;
+      setWordStatus(editingWordId ? '正在更新單字...' : '正在儲存單字...');
+
+      try {
+        if (!translation) {
+          translation = await autoTranslateWord();
+        }
+        if (!translation) {
+          throw new Error('請輸入中文翻譯');
+        }
+
+        const method = editingWordId ? 'PUT' : 'POST';
+        const url = editingWordId ? `/api/words/${editingWordId}` : '/api/words';
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            word,
+            translation,
+            note,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '儲存單字失敗');
+
+        if (editingWordId) {
+          wordLibrary = wordLibrary.map((item) => (item.id === data.item.id ? data.item : item));
+          setWordStatus('已更新單字');
+        } else {
+          wordLibrary.unshift(data.item);
+          setWordStatus('已加入單字生字庫');
+        }
+
+        renderWords();
+        resetWordForm({ keepStatus: true });
+      } catch (err) {
+        setWordStatus(err.message || '儲存單字失敗', true);
+      } finally {
+        saveWordBtn.disabled = false;
+        translateWordBtn.disabled = false;
+        cancelWordEditBtn.disabled = false;
+      }
+    }
+
+    async function removeWord(wordId) {
+      try {
+        const response = await fetch(`/api/words/${wordId}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '刪除失敗');
+        wordLibrary = wordLibrary.filter((item) => item.id !== wordId);
+        if (editingWordId === wordId) {
+          resetWordForm({ keepStatus: true });
+        }
+        renderWords();
+        setWordStatus('已刪除單字');
+      } catch (err) {
+        setWordStatus(err.message || '刪除失敗', true);
+      }
+    }
+
+    function renderWords() {
+      wordCountEl.textContent = `${wordLibrary.length} 個單字`;
+
+      if (wordLibrary.length === 0) {
+        wordListEl.innerHTML = '<div class="empty">目前沒有單字。輸入英文後可自動帶入中文翻譯，再加入單字生字庫。</div>';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+
+      wordLibrary.forEach((item) => {
+        const card = document.createElement('div');
+        card.className = 'word-item';
+
+        const top = document.createElement('div');
+        top.className = 'word-top';
+
+        const main = document.createElement('div');
+        main.className = 'word-main';
+
+        const term = document.createElement('div');
+        term.className = 'word-term';
+        term.textContent = item.word;
+
+        const translation = document.createElement('div');
+        translation.className = 'word-translation';
+        translation.textContent = item.translation;
+
+        main.appendChild(term);
+        main.appendChild(translation);
+
+        if (item.note) {
+          const note = document.createElement('div');
+          note.className = 'word-note';
+          note.textContent = item.note;
+          main.appendChild(note);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'library-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'action-btn primary';
+        editBtn.type = 'button';
+        editBtn.textContent = '編輯';
+        editBtn.addEventListener('click', () => fillWordForm(item));
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'action-btn';
+        removeBtn.type = 'button';
+        removeBtn.textContent = '刪除';
+        removeBtn.addEventListener('click', async () => {
+          if (!window.confirm(`確定要刪除單字「${item.word}」嗎？`)) return;
+          await removeWord(item.id);
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(removeBtn);
+
+        top.appendChild(main);
+        top.appendChild(actions);
+
+        card.appendChild(top);
+        fragment.appendChild(card);
+      });
+
+      wordListEl.innerHTML = '';
+      wordListEl.appendChild(fragment);
+    }
+
     async function fetchTranscript() {
       const url = urlInput.value.trim();
       if (!url) {
@@ -816,6 +1260,35 @@
       }
     });
 
+    translateWordBtn.addEventListener('click', async () => {
+      await autoTranslateWord({ force: true });
+    });
+
+    saveWordBtn.addEventListener('click', submitWord);
+
+    cancelWordEditBtn.addEventListener('click', () => {
+      resetWordForm();
+      setWordStatus('已取消編輯');
+    });
+
+    wordInputEl.addEventListener('blur', async () => {
+      await autoTranslateWord();
+    });
+
+    wordInputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        submitWord();
+      }
+    });
+
+    wordTranslationInputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        submitWord();
+      }
+    });
+
     loadBtn.addEventListener('click', fetchTranscript);
     urlInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -826,6 +1299,8 @@
 
     initTabs();
     fetchLibrary().catch((err) => setLibraryStatus(err.message || '讀取生字庫失敗', true));
+    fetchWords().catch((err) => setWordStatus(err.message || '讀取單字生字庫失敗', true));
+    resetWordForm({ keepStatus: true });
     setStatus('貼上 YouTube 影片網址後，按「讀取字幕」。長按字幕可加入生字庫。');
   </script>
 </body>

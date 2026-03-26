@@ -1,0 +1,58 @@
+[
+  {
+    "id": "d6be0c532d8940af95c1e4f5cea6bce0",
+    "word": "yoyo ball",
+    "translation": "溜溜球",
+    "note": "",
+    "createdAt": "2026-03-26T07:39:21.545982+00:00",
+    "updatedAt": "2026-03-26T07:39:34.583600+00:00"
+  },
+  {
+    "id": "e5c2e683cd89409b827837aa906f13ac",
+    "word": "yes",
+    "translation": "是的",
+    "note": "",
+    "createdAt": "2026-03-26T07:36:13.564919+00:00",
+    "updatedAt": "2026-03-26T07:36:13.564919+00:00"
+  },
+  {
+    "id": "ec713fc953c548ed85861940cd07ac43",
+    "word": "according to",
+    "translation": "根據",
+    "note": "",
+    "createdAt": "2026-03-26T07:36:10.538118+00:00",
+    "updatedAt": "2026-03-26T07:36:10.538118+00:00"
+  },
+  {
+    "id": "8d5a4763eff24d7f82ea32886686052e",
+    "word": "dog",
+    "translation": "狗",
+    "note": "",
+    "createdAt": "2026-03-26T07:36:05.984781+00:00",
+    "updatedAt": "2026-03-26T07:36:05.984781+00:00"
+  },
+  {
+    "id": "4551646919d3477c8ffbac7c569f47f5",
+    "word": "cat",
+    "translation": "貓",
+    "note": "",
+    "createdAt": "2026-03-26T07:36:03.801984+00:00",
+    "updatedAt": "2026-03-26T07:36:03.801984+00:00"
+  },
+  {
+    "id": "cabf966fba544e76a81ec05e1dac720d",
+    "word": "banana",
+    "translation": "香蕉",
+    "note": "",
+    "createdAt": "2026-03-26T07:36:01.609758+00:00",
+    "updatedAt": "2026-03-26T07:36:01.609758+00:00"
+  },
+  {
+    "id": "93fa17d291c548809d1a7346bad4b06f",
+    "word": "apple",
+    "translation": "蘋果",
+    "note": "",
+    "createdAt": "2026-03-26T07:33:07.224574+00:00",
+    "updatedAt": "2026-03-26T07:33:07.224574+00:00"
+  }
+]

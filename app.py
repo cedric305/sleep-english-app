@@ -21,13 +21,17 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 CLIPS_DIR = DATA_DIR / "clips"
 LIBRARY_FILE = DATA_DIR / "library.json"
+WORDS_FILE = DATA_DIR / "words.json"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 CLIPS_DIR.mkdir(parents=True, exist_ok=True)
 if not LIBRARY_FILE.exists():
     LIBRARY_FILE.write_text("[]", encoding="utf-8")
+if not WORDS_FILE.exists():
+    WORDS_FILE.write_text("[]", encoding="utf-8")
 
 library_lock = threading.Lock()
+words_lock = threading.Lock()
 
 
 def extract_video_id(youtube_url: str) -> str | None:
@@ -58,6 +62,16 @@ def clean_caption_text(text: str) -> str:
     text = text.replace("\n", " ")
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+def clean_word_text(text: str) -> str:
+    text = text.replace("\n", " ")
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def normalize_word(text: str) -> str:
+    return clean_word_text(text).casefold()
 
 
 def visual_text_length(text: str) -> int:
@@ -308,10 +322,10 @@ def parse_json3_captions(payload: dict) -> list[dict]:
     return merge_caption_chunks(chunks)
 
 
-def load_library_items() -> list[dict]:
-    with library_lock:
+def load_json_items(file_path: Path, lock: threading.Lock) -> list[dict]:
+    with lock:
         try:
-            items = json.loads(LIBRARY_FILE.read_text(encoding="utf-8"))
+            items = json.loads(file_path.read_text(encoding="utf-8"))
             if isinstance(items, list):
                 return items
             return []
@@ -319,9 +333,17 @@ def load_library_items() -> list[dict]:
             return []
 
 
+def save_json_items(file_path: Path, lock: threading.Lock, items: list[dict]) -> None:
+    with lock:
+        file_path.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_library_items() -> list[dict]:
+    return load_json_items(LIBRARY_FILE, library_lock)
+
+
 def save_library_items(items: list[dict]) -> None:
-    with library_lock:
-        LIBRARY_FILE.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+    save_json_items(LIBRARY_FILE, library_lock, items)
 
 
 def serialize_library_item(item: dict) -> dict:
@@ -335,6 +357,50 @@ def serialize_library_item(item: dict) -> dict:
         "createdAt": item["createdAt"],
         "audioUrl": f"/api/library/audio/{item['id']}",
     }
+
+
+def load_word_items() -> list[dict]:
+    return load_json_items(WORDS_FILE, words_lock)
+
+
+def save_word_items(items: list[dict]) -> None:
+    save_json_items(WORDS_FILE, words_lock, items)
+
+
+def serialize_word_item(item: dict) -> dict:
+    return {
+        "id": item["id"],
+        "word": item["word"],
+        "translation": item.get("translation", ""),
+        "note": item.get("note", ""),
+        "createdAt": item["createdAt"],
+        "updatedAt": item.get("updatedAt", item["createdAt"]),
+    }
+
+
+def translate_word_to_zh(word: str) -> str:
+    response = requests.get(
+        "https://translate.googleapis.com/translate_a/single",
+        params={
+            "client": "gtx",
+            "sl": "en",
+            "tl": "zh-TW",
+            "dt": "t",
+            "q": word,
+        },
+        timeout=12,
+    )
+    response.raise_for_status()
+
+    payload = response.json()
+    if not isinstance(payload, list) or not payload or not isinstance(payload[0], list):
+        return ""
+
+    parts = []
+    for row in payload[0]:
+        if isinstance(row, list) and row and isinstance(row[0], str):
+            parts.append(row[0])
+    return clean_word_text("".join(parts))
 
 
 def fmt_seconds(seconds: float) -> str:
@@ -550,6 +616,105 @@ def serve_library_audio(clip_id: str):
     if not audio_path.exists():
         return jsonify({"error": "找不到音檔"}), 404
     return send_from_directory(CLIPS_DIR, audio_path.name, mimetype="audio/mpeg", as_attachment=False)
+
+
+@app.route("/api/words", methods=["GET"])
+def list_words():
+    items = load_word_items()
+    serialized = [serialize_word_item(x) for x in items]
+    return jsonify({"items": serialized})
+
+
+@app.route("/api/words/translate")
+def translate_word():
+    word = clean_word_text(request.args.get("word", ""))
+    if not word:
+        return jsonify({"error": "請先輸入單字"}), 400
+
+    try:
+        translation = translate_word_to_zh(word)
+    except requests.RequestException as exc:
+        return jsonify({"error": f"查詢翻譯失敗: {exc}"}), 502
+    except ValueError:
+        return jsonify({"error": "翻譯服務回傳格式錯誤"}), 502
+
+    if not translation:
+        return jsonify({"error": "暫時找不到對應翻譯，請手動輸入"}), 404
+
+    return jsonify({"word": word, "translation": translation})
+
+
+@app.route("/api/words", methods=["POST"])
+def create_word():
+    payload = request.get_json(silent=True) or {}
+    word = clean_word_text(payload.get("word") or "")
+    translation = clean_word_text(payload.get("translation") or "")
+    note = clean_word_text(payload.get("note") or "")
+
+    if not word:
+        return jsonify({"error": "單字不可為空"}), 400
+    if not translation:
+        return jsonify({"error": "中文翻譯不可為空"}), 400
+
+    items = load_word_items()
+    normalized = normalize_word(word)
+    if any(normalize_word(x.get("word", "")) == normalized for x in items):
+        return jsonify({"error": "這個單字已經在生字庫裡"}), 409
+
+    now = datetime.now(timezone.utc).isoformat()
+    item = {
+        "id": uuid.uuid4().hex,
+        "word": word,
+        "translation": translation,
+        "note": note,
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    items.insert(0, item)
+    save_word_items(items)
+    return jsonify({"item": serialize_word_item(item)})
+
+
+@app.route("/api/words/<word_id>", methods=["PUT"])
+def update_word(word_id: str):
+    payload = request.get_json(silent=True) or {}
+    word = clean_word_text(payload.get("word") or "")
+    translation = clean_word_text(payload.get("translation") or "")
+    note = clean_word_text(payload.get("note") or "")
+
+    if not word:
+        return jsonify({"error": "單字不可為空"}), 400
+    if not translation:
+        return jsonify({"error": "中文翻譯不可為空"}), 400
+
+    items = load_word_items()
+    target = next((x for x in items if x.get("id") == word_id), None)
+    if not target:
+        return jsonify({"error": "找不到單字"}), 404
+
+    normalized = normalize_word(word)
+    if any(x.get("id") != word_id and normalize_word(x.get("word", "")) == normalized for x in items):
+        return jsonify({"error": "這個單字已經在生字庫裡"}), 409
+
+    target["word"] = word
+    target["translation"] = translation
+    target["note"] = note
+    target["updatedAt"] = datetime.now(timezone.utc).isoformat()
+
+    save_word_items(items)
+    return jsonify({"item": serialize_word_item(target)})
+
+
+@app.route("/api/words/<word_id>", methods=["DELETE"])
+def delete_word(word_id: str):
+    items = load_word_items()
+    exists = any(x.get("id") == word_id for x in items)
+    if not exists:
+        return jsonify({"error": "找不到單字"}), 404
+
+    items = [x for x in items if x.get("id") != word_id]
+    save_word_items(items)
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":
