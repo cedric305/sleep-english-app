@@ -876,7 +876,7 @@
     async function saveCaptionToLibrary(item) {
       if (!currentVideoId) {
         setLibraryStatus('尚未載入影片，無法儲存片段', true);
-        return;
+        return false;
       }
 
       sheetSaveBtn.disabled = true;
@@ -902,8 +902,10 @@
         clipLibrary.unshift(data.item);
         renderLibrary();
         setLibraryStatus('已儲存到錄音檔生字庫');
+        return true;
       } catch (err) {
         setLibraryStatus(err.message || '儲存失敗', true);
+        return false;
       } finally {
         sheetSaveBtn.disabled = false;
         sheetCancelBtn.disabled = false;
@@ -1230,7 +1232,8 @@
 
     sheetSaveBtn.addEventListener('click', async () => {
       if (!sheetCaption) return;
-      await saveCaptionToLibrary(sheetCaption);
+      const saved = await saveCaptionToLibrary(sheetCaption);
+      if (!saved) return;
       closeClipSheet();
       switchTab('libraryTab');
     });

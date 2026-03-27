@@ -413,6 +413,23 @@ def fmt_seconds(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}.{mm:03d}"
 
 
+def choose_audio_stream(info: dict) -> tuple[str, dict[str, str]]:
+    audio_url = info.get("url")
+    if not audio_url:
+        requested_formats = info.get("requested_formats") or []
+        for fmt in requested_formats:
+            if fmt.get("acodec") and fmt.get("acodec") != "none" and fmt.get("url"):
+                audio_url = fmt["url"]
+                break
+
+    if not audio_url:
+        raise RuntimeError("找不到可用的音訊串流")
+
+    headers = info.get("http_headers") or {}
+    clean_headers = {str(k): str(v) for k, v in headers.items() if v}
+    return audio_url, clean_headers
+
+
 def create_audio_clip(video_id: str, start: float, end: float, clip_id: str) -> Path:
     ffmpeg_path = shutil.which("ffmpeg")
     if not ffmpeg_path:
@@ -422,74 +439,54 @@ def create_audio_clip(video_id: str, start: float, end: float, clip_id: str) -> 
     clip_start = max(0.0, start)
     clip_end = max(clip_start + 0.6, end)
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_dir = Path(tmp)
-        output_template = tmp_dir / "source.%(ext)s"
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "outtmpl": str(output_template),
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "overwrites": True,
-        }
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "skip_download": True,
+    }
 
+    try:
         with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            requested_downloads = info.get("requested_downloads") or []
+            info = ydl.extract_info(url, download=False)
+    except Exception as exc:
+        raise RuntimeError(f"音訊來源取得失敗: {exc}") from exc
 
-            candidates = []
-            for item in requested_downloads:
-                filepath = item.get("filepath")
-                if filepath:
-                    path = Path(filepath)
-                    if path.exists():
-                        candidates.append(path)
+    audio_url, audio_headers = choose_audio_stream(info)
 
-            if not candidates:
-                prepared = Path(ydl.prepare_filename(info))
-                if prepared.exists():
-                    candidates.append(prepared)
+    dest = CLIPS_DIR / f"{clip_id}.mp3"
+    ffmpeg_cmd = [
+        ffmpeg_path,
+        "-y",
+        "-ss",
+        f"{clip_start:.3f}",
+        "-to",
+        f"{clip_end:.3f}",
+    ]
+    for key, value in audio_headers.items():
+        ffmpeg_cmd.extend(["-headers", f"{key}: {value}\r\n"])
 
-            if not candidates:
-                candidates = sorted(
-                    [p for p in tmp_dir.iterdir() if p.is_file()],
-                    key=lambda p: p.stat().st_size,
-                    reverse=True,
-                )
-
-        if not candidates:
-            raise RuntimeError("音檔下載失敗: 找不到來源音訊檔")
-
-        source_audio = candidates[0]
-
-        dest = CLIPS_DIR / f"{clip_id}.mp3"
-        ffmpeg_cmd = [
-            ffmpeg_path,
-            "-y",
+    ffmpeg_cmd.extend(
+        [
             "-i",
-            str(source_audio),
-            "-ss",
-            f"{clip_start:.3f}",
-            "-to",
-            f"{clip_end:.3f}",
+            audio_url,
             "-vn",
-            "-map",
-            "a:0",
             "-acodec",
             "libmp3lame",
             "-q:a",
             "2",
             str(dest),
         ]
-        proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
-            raise RuntimeError(f"音檔裁切失敗: {(proc.stderr or proc.stdout).strip()}")
+    )
+    proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"音檔裁切失敗: {(proc.stderr or proc.stdout).strip()}")
 
-        if not dest.exists():
-            raise RuntimeError("音檔裁切失敗: 找不到輸出檔案")
+    if not dest.exists():
+        raise RuntimeError("音檔裁切失敗: 找不到輸出檔案")
 
-        return dest
+    return dest
 
 
 @app.route("/")
