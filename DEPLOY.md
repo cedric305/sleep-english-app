@@ -1,42 +1,44 @@
 # Cloud Deploy
 
-## Recommended
+## Recommended free setup
 
-Use a Docker-based host with persistent storage. This app stores:
+- Frontend + Flask API: Render Free Web Service
+- Data + audio storage: Supabase Free
 
-- saved audio clips in `data/clips/`
-- sentence library in `data/library.json`
-- word library in `data/words.json`
+This app now supports two modes:
 
-Without a volume, those files may disappear after a restart or redeploy.
+- Local mode: stores data in `data/`
+- Supabase mode: stores library items and words in Supabase tables, and mp3 clips in a Supabase Storage bucket
 
-## Railway
+Supabase mode is enabled when both of these environment variables are set:
 
-1. Push this project to GitHub.
-2. Create a new Railway project from that GitHub repo.
-3. Railway will detect the `Dockerfile` and build the app automatically.
-4. Add a volume and mount it to `/data`.
-5. Set the app's public port to `8080` if Railway does not detect it automatically.
-6. Deploy.
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-Environment variables:
+## 1. Prepare Supabase
 
-- `APP_DATA_DIR=/data`
-- `PORT=8080`
+1. Create a Supabase project.
+2. Open the SQL editor.
+3. Run the SQL in `supabase_setup.sql`.
+4. In project settings, copy:
+   - Project URL
+   - service role key
 
-## Render
+## 2. Deploy on Render Free
 
-1. Push this project to GitHub.
-2. Create a new Web Service from the repo.
-3. Choose Docker as the runtime.
-4. Add a persistent disk and mount it to `/data`.
-5. Add environment variables:
-   - `APP_DATA_DIR=/data`
-   - `PORT=8080`
-6. Deploy.
+1. Create a new Web Service from this GitHub repo.
+2. Keep Docker as the runtime.
+3. Use branch `main`.
+4. Region: choose the closest region, such as Singapore.
+5. Instance type: `Free`.
+6. Add environment variables:
+   - `SUPABASE_URL=<your supabase project url>`
+   - `SUPABASE_SERVICE_ROLE_KEY=<your service role key>`
+   - `SUPABASE_BUCKET=clips`
+7. Deploy.
 
 ## Notes
 
-- `ffmpeg` is already installed in the Docker image.
-- The app serves saved mp3 files from the mounted data directory.
-- If you later want video summary back, you will need a cloud-accessible LLM provider. Running Ollama on your home computer will not work reliably after cloud deployment.
+- In Supabase mode, Render does not need a persistent disk.
+- The audio bucket created by `supabase_setup.sql` is public so the app can stream saved mp3 clips directly.
+- The service role key must stay server-side only. Do not put it into frontend JavaScript.

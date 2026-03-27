@@ -10,10 +10,10 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 import requests
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
 from yt_dlp import YoutubeDL
 
 app = Flask(__name__)
@@ -23,6 +23,9 @@ DATA_DIR = Path(os.environ.get("APP_DATA_DIR", str(BASE_DIR / "data"))).resolve(
 CLIPS_DIR = DATA_DIR / "clips"
 LIBRARY_FILE = DATA_DIR / "library.json"
 WORDS_FILE = DATA_DIR / "words.json"
+SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or ""
+SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "clips")
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 CLIPS_DIR.mkdir(parents=True, exist_ok=True)
@@ -33,6 +36,107 @@ if not WORDS_FILE.exists():
 
 library_lock = threading.Lock()
 words_lock = threading.Lock()
+
+
+def use_supabase() -> bool:
+    return bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
+
+
+def supabase_rest_url(path: str) -> str:
+    return f"{SUPABASE_URL}/rest/v1/{path.lstrip('/')}"
+
+
+def supabase_storage_url(path: str) -> str:
+    return f"{SUPABASE_URL}/storage/v1/{path.lstrip('/')}"
+
+
+def supabase_headers(*, json_content: bool = True, prefer: str | None = None) -> dict[str, str]:
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+    }
+    if json_content:
+        headers["Content-Type"] = "application/json"
+    if prefer:
+        headers["Prefer"] = prefer
+    return headers
+
+
+def supabase_request(
+    method: str,
+    url: str,
+    *,
+    params: dict | None = None,
+    json_body: dict | list | None = None,
+    data: bytes | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: int = 20,
+) -> requests.Response:
+    response = requests.request(
+        method,
+        url,
+        params=params,
+        json=json_body,
+        data=data,
+        headers=headers,
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    return response
+
+
+def row_to_library_item(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "videoId": row.get("video_id", ""),
+        "videoTitle": row.get("video_title", ""),
+        "start": float(row.get("start", 0.0)),
+        "end": float(row.get("end", 0.0)),
+        "text": row.get("text", ""),
+        "createdAt": row.get("created_at", ""),
+        "audioPath": row.get("audio_path", ""),
+    }
+
+
+def library_item_to_row(item: dict) -> dict:
+    return {
+        "id": item["id"],
+        "video_id": item["videoId"],
+        "video_title": item.get("videoTitle", ""),
+        "start": item["start"],
+        "end": item["end"],
+        "text": item["text"],
+        "created_at": item["createdAt"],
+        "audio_path": item.get("audioPath", f"{item['id']}.mp3"),
+    }
+
+
+def row_to_word_item(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "word": row.get("word", ""),
+        "translation": row.get("translation", ""),
+        "note": row.get("note", ""),
+        "createdAt": row.get("created_at", ""),
+        "updatedAt": row.get("updated_at", row.get("created_at", "")),
+    }
+
+
+def word_item_to_row(item: dict) -> dict:
+    return {
+        "id": item["id"],
+        "word": item["word"],
+        "word_normalized": normalize_word(item["word"]),
+        "translation": item.get("translation", ""),
+        "note": item.get("note", ""),
+        "created_at": item["createdAt"],
+        "updated_at": item.get("updatedAt", item["createdAt"]),
+    }
+
+
+def get_supabase_public_audio_url(audio_path: str) -> str:
+    safe_path = "/".join(quote(part) for part in audio_path.split("/") if part)
+    return supabase_storage_url(f"object/public/{SUPABASE_BUCKET}/{safe_path}")
 
 
 def extract_video_id(youtube_url: str) -> str | None:
@@ -340,14 +444,44 @@ def save_json_items(file_path: Path, lock: threading.Lock, items: list[dict]) ->
 
 
 def load_library_items() -> list[dict]:
+    if use_supabase():
+        response = supabase_request(
+            "GET",
+            supabase_rest_url("library_items"),
+            params={"select": "*", "order": "created_at.desc"},
+            headers=supabase_headers(json_content=False),
+        )
+        rows = response.json()
+        return [row_to_library_item(row) for row in rows]
     return load_json_items(LIBRARY_FILE, library_lock)
 
 
 def save_library_items(items: list[dict]) -> None:
+    if use_supabase():
+        rows = [library_item_to_row(item) for item in items]
+        supabase_request(
+            "DELETE",
+            supabase_rest_url("library_items"),
+            params={"id": "neq.__never__"},
+            headers=supabase_headers(json_content=False),
+        )
+        if rows:
+            supabase_request(
+                "POST",
+                supabase_rest_url("library_items"),
+                json_body=rows,
+                headers=supabase_headers(prefer="return=minimal"),
+            )
+        return
     save_json_items(LIBRARY_FILE, library_lock, items)
 
 
 def serialize_library_item(item: dict) -> dict:
+    audio_url = (
+        get_supabase_public_audio_url(item.get("audioPath", f"{item['id']}.mp3"))
+        if use_supabase()
+        else f"/api/library/audio/{item['id']}"
+    )
     return {
         "id": item["id"],
         "videoId": item["videoId"],
@@ -356,15 +490,40 @@ def serialize_library_item(item: dict) -> dict:
         "end": item["end"],
         "text": item["text"],
         "createdAt": item["createdAt"],
-        "audioUrl": f"/api/library/audio/{item['id']}",
+        "audioUrl": audio_url,
     }
 
 
 def load_word_items() -> list[dict]:
+    if use_supabase():
+        response = supabase_request(
+            "GET",
+            supabase_rest_url("word_items"),
+            params={"select": "*", "order": "created_at.desc"},
+            headers=supabase_headers(json_content=False),
+        )
+        rows = response.json()
+        return [row_to_word_item(row) for row in rows]
     return load_json_items(WORDS_FILE, words_lock)
 
 
 def save_word_items(items: list[dict]) -> None:
+    if use_supabase():
+        rows = [word_item_to_row(item) for item in items]
+        supabase_request(
+            "DELETE",
+            supabase_rest_url("word_items"),
+            params={"id": "neq.__never__"},
+            headers=supabase_headers(json_content=False),
+        )
+        if rows:
+            supabase_request(
+                "POST",
+                supabase_rest_url("word_items"),
+                json_body=rows,
+                headers=supabase_headers(prefer="return=minimal"),
+            )
+        return
     save_json_items(WORDS_FILE, words_lock, items)
 
 
@@ -411,6 +570,36 @@ def fmt_seconds(seconds: float) -> str:
     h = ms // 3600000
     mm = ms % 1000
     return f"{h:02d}:{m:02d}:{s:02d}.{mm:03d}"
+
+
+def upload_clip_to_supabase(audio_path: Path, dest_name: str) -> str:
+    response = supabase_request(
+        "POST",
+        supabase_storage_url(f"object/{SUPABASE_BUCKET}/{quote(dest_name)}"),
+        data=audio_path.read_bytes(),
+        headers={
+            **supabase_headers(json_content=False),
+            "Content-Type": "audio/mpeg",
+            "x-upsert": "true",
+        },
+        timeout=60,
+    )
+    payload = response.json()
+    stored_path = payload.get("Key") or payload.get("path") or dest_name
+    return stored_path
+
+
+def delete_supabase_clips(paths: list[str]) -> None:
+    clip_paths = [path for path in paths if path]
+    if not clip_paths:
+        return
+    supabase_request(
+        "DELETE",
+        supabase_storage_url(f"object/{SUPABASE_BUCKET}"),
+        json_body={"prefixes": clip_paths},
+        headers=supabase_headers(),
+        timeout=60,
+    )
 
 
 def create_audio_clip(video_id: str, start: float, end: float, clip_id: str) -> Path:
@@ -565,10 +754,17 @@ def create_library_item():
     end = max(start + 0.6, end)
 
     clip_id = uuid.uuid4().hex
+    clip_path = None
     try:
-        create_audio_clip(video_id=video_id, start=start, end=end, clip_id=clip_id)
+        clip_path = create_audio_clip(video_id=video_id, start=start, end=end, clip_id=clip_id)
+        audio_path = f"{clip_id}.mp3"
+        if use_supabase():
+            audio_path = upload_clip_to_supabase(clip_path, f"{clip_id}.mp3")
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+    finally:
+        if use_supabase() and clip_path and clip_path.exists():
+            clip_path.unlink(missing_ok=True)
 
     item = {
         "id": clip_id,
@@ -578,6 +774,7 @@ def create_library_item():
         "end": end,
         "text": text,
         "createdAt": datetime.now(timezone.utc).isoformat(),
+        "audioPath": audio_path,
     }
 
     items = load_library_items()
@@ -589,30 +786,44 @@ def create_library_item():
 @app.route("/api/library/<clip_id>", methods=["DELETE"])
 def delete_library_item(clip_id: str):
     items = load_library_items()
-    exists = any(x.get("id") == clip_id for x in items)
-    if not exists:
+    target = next((x for x in items if x.get("id") == clip_id), None)
+    if not target:
         return jsonify({"error": "找不到片段"}), 404
 
     items = [x for x in items if x.get("id") != clip_id]
     save_library_items(items)
 
-    audio_path = CLIPS_DIR / f"{clip_id}.mp3"
-    if audio_path.exists():
-        audio_path.unlink()
+    if use_supabase():
+        delete_supabase_clips([target.get("audioPath", f"{clip_id}.mp3")])
+    else:
+        audio_path = CLIPS_DIR / f"{clip_id}.mp3"
+        if audio_path.exists():
+            audio_path.unlink()
 
     return jsonify({"ok": True})
 
 
 @app.route("/api/library/clear", methods=["POST"])
 def clear_library():
+    items = load_library_items()
     save_library_items([])
-    for path in CLIPS_DIR.glob("*.mp3"):
-        path.unlink(missing_ok=True)
+    if use_supabase():
+        delete_supabase_clips([item.get("audioPath", f"{item['id']}.mp3") for item in items])
+    else:
+        for path in CLIPS_DIR.glob("*.mp3"):
+            path.unlink(missing_ok=True)
     return jsonify({"ok": True})
 
 
 @app.route("/api/library/audio/<clip_id>")
 def serve_library_audio(clip_id: str):
+    if use_supabase():
+        items = load_library_items()
+        target = next((x for x in items if x.get("id") == clip_id), None)
+        if not target:
+            return jsonify({"error": "找不到音檔"}), 404
+        return redirect(get_supabase_public_audio_url(target.get("audioPath", f"{clip_id}.mp3")))
+
     audio_path = CLIPS_DIR / f"{clip_id}.mp3"
     if not audio_path.exists():
         return jsonify({"error": "找不到音檔"}), 404
