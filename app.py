@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -18,7 +19,7 @@ from yt_dlp import YoutubeDL
 app = Flask(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path(os.environ.get("APP_DATA_DIR", str(BASE_DIR / "data"))).resolve()
 CLIPS_DIR = DATA_DIR / "clips"
 LIBRARY_FILE = DATA_DIR / "library.json"
 WORDS_FILE = DATA_DIR / "words.json"
@@ -718,4 +719,6 @@ def delete_word(word_id: str):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", "5000"))
+    debug = os.environ.get("FLASK_DEBUG", "").lower() in {"1", "true", "yes", "on"}
+    app.run(host="0.0.0.0", port=port, debug=debug)
